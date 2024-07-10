@@ -107,13 +107,19 @@ fn main() {
 
     config
         .profile("Release")
-        .define("BUILD_SHARED_LIBS", "ON")
+        .define("BUILD_SHARED_LIBS", "OFF")
         .define("WHISPER_ALL_WARNINGS", "OFF")
         .define("WHISPER_ALL_WARNINGS_3RD_PARTY", "OFF")
         .define("WHISPER_BUILD_TESTS", "OFF")
         .define("WHISPER_BUILD_EXAMPLES", "OFF")
         .very_verbose(true)
         .pic(true);
+
+    // build shared libs for Windows
+    let build_shared_libs = target.contains("window") && !target.contains("gnu");
+    if build_shared_libs {
+        config.define("BUILD_SHARED_LIBS", "ON");
+    }
 
     if cfg!(feature = "coreml") {
         config.define("WHISPER_COREML", "ON");
@@ -156,7 +162,7 @@ fn main() {
         println!("cargo:rustc-link-search={}", out.join("build").display());
     }
     println!("cargo:rustc-link-search=native={}", destination.display());
-    println!("cargo:rustc-link-lib=dylib=whisper");
+    println!("cargo:rustc-link-lib=static=whisper");
 
     // for whatever reason this file is generated during build and triggers cargo complaining
     _ = std::fs::remove_file("bindings/javascript/package.json");
