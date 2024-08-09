@@ -66,6 +66,7 @@ fn main() {
             }
         }
     }
+    let mut hipblas_on_windows = false;
     #[cfg(feature = "hipblas")]
     {
         println!("cargo:rustc-link-lib=hipblas");
@@ -74,7 +75,16 @@ fn main() {
 
         cfg_if::cfg_if! {
             if #[cfg(target_os = "windows")] {
-                panic!("Due to a problem with the last revision of the ROCm 5.7 library, it is not possible to compile the library for the windows environment.\nSee https://github.com/ggerganov/whisper.cpp/issues/2202 for more details.")
+                hipblas_on_windows = true;
+                println!("cargo:rerun-if-env-changed=HIP_PATH");
+
+                let hip_path = match env::var("HIP_PATH") {
+                    Ok(path) =>PathBuf::from(path),
+                    Err(_) => panic!("HIP_PATH is not set"),
+                };
+                let hip_lib_path = hip_path.join("lib");
+
+                println!("cargo:rustc-link-search={}",hip_lib_path.display());
             } else {
                 println!("cargo:rerun-if-env-changed=HIP_PATH");
 
@@ -163,6 +173,10 @@ fn main() {
         .very_verbose(true)
         .pic(true);
 
+    if hipblas_on_windows {
+        config.generator("Ninja");
+    }
+
     if cfg!(feature = "coreml") {
         config.define("WHISPER_COREML", "ON");
         config.define("WHISPER_COREML_ALLOW_FALLBACK", "1");
@@ -179,6 +193,12 @@ fn main() {
         println!("cargo:rerun-if-env-changed=AMDGPU_TARGETS");
         if let Ok(gpu_targets) = env::var("AMDGPU_TARGETS") {
             config.define("AMDGPU_TARGETS", gpu_targets);
+        }
+        if hipblas_on_windows {
+            // clang-cl.exe instead of clang.exe and clang++.exe
+            // fix: clang: error: unknown argument: '-nologo'
+            config.define("CMAKE_C_COMPILER", "clang-cl");
+            config.define("CMAKE_CXX_COMPILER", "clang-cl");
         }
     }
 
@@ -249,6 +269,14 @@ fn main() {
 
     add_link_search_path(&out.join("build")).unwrap();
 
+    if target.contains("window") && !target.contains("gnu") && !hipblas_on_windows {
+        println!(
+            "cargo:rustc-link-search={}",
+            out.join("build").join("Release").display()
+        );
+    } else {
+        println!("cargo:rustc-link-search={}", out.join("build").display());
+    }
     println!("cargo:rustc-link-search=native={}", destination.display());
     println!("cargo:rustc-link-lib=static=whisper");
     println!("cargo:rustc-link-lib=static=ggml");
