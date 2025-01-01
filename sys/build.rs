@@ -253,6 +253,19 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", destination.display());
     println!("cargo:rustc-link-lib=static=whisper");
     println!("cargo:rustc-link-lib=static=ggml");
+    // ref: https://github.com/tazz4843/whisper-rs/pull/193/files#diff-2620be2afc249413fa14ee1f678c9c7ab8f0658f44f5c6d49cff57956c716deb
+    println!("cargo:rustc-link-lib=static=ggml-base");
+    println!("cargo:rustc-link-lib=static=ggml-cpu");
+    if cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=static=ggml-blas");
+    }
+    if cfg!(feature = "vulkan") {
+        println!("cargo:rustc-link-lib=static=ggml-vulkan");
+    }
+
+    if cfg!(feature = "metal") {
+        println!("cargo:rustc-link-lib=static=ggml-metal");
+    }
 
     println!(
         "cargo:WHISPER_CPP_VERSION={}",
